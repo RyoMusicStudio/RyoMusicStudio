@@ -1,118 +1,161 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ryo Music Studio</title>
-  <script src="https://cdn.jsdelivr.net/npm/tone@latest/build/Tone.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #0a0a0a;
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      text-align: center;
+      padding: 30px;
+    }
+
+    h1 {
+      color: #00e0ff;
+      margin-bottom: 20px;
+    }
+
+    input[type="file"] {
+      margin: 20px 0;
+      padding: 10px;
+      background: #1a1a1a;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    audio {
+      width: 80%;
+      margin: 20px 0;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .slider-group {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 10px;
+      width: 260px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+      color: #00e0ff;
+    }
+
+    input[type="number"] {
+      width: 70px;
+      padding: 6px;
+      border-radius: 5px;
+      border: none;
+      text-align: center;
+      background: #222;
+      color: #00e0ff;
+    }
+
+    button {
+      background: #00e0ff;
+      color: black;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #00a3cc;
+    }
+  </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
-  <h1 class="text-3xl font-bold text-green-400 mb-6">Ryo Music Studio</h1>
-  <div class="bg-gray-800 p-6 rounded-2xl shadow-lg w-full max-w-md">
-    <input type="file" id="fileInput" accept="audio/*" class="mb-4 w-full" multiple><ul id="playlist" class="space-y-2 mb-4"></ul>
 
-<div class="flex items-center justify-between mb-4">
-  <button id="playBtn" class="bg-green-500 px-4 py-2 rounded-lg text-black font-semibold">Play</button>
-  <button id="stopBtn" class="bg-red-500 px-4 py-2 rounded-lg text-white font-semibold">Stop</button>
-</div>
+<body>
+  <h1> Ryo Music Studio </h1>
+  <p>Upload your song and customize playback!</p>
 
-<div class="mb-4">
-  <label class="block mb-1 text-sm text-gray-300">Speed</label>
-  <input type="range" id="speedControl" min="0.5" max="2" step="0.1" value="1" class="w-full">
-</div>
+  <input type="file" id="audioFile" accept="audio/*">
+  <br>
+  <audio id="player" controls></audio>
 
-<div class="mb-4">
-  <label class="block mb-1 text-sm text-gray-300">Pitch (Semitones)</label>
-  <input type="range" id="pitchControl" min="-12" max="12" step="1" value="0" class="w-full">
-</div>
+  <div class="controls">
+    <div class="slider-group">
+      <label for="speed">Speed </label>
+      <input type="number" id="speed" value="1" step="0.1" min="0.5" max="10">
+    </div>
 
-<div class="mb-4">
-  <label class="block mb-1 text-sm text-gray-300">Echo</label>
-  <input type="range" id="echoControl" min="0" max="1" step="0.1" value="0" class="w-full">
-</div>
+    <div class="slider-group">
+      <label for="pitch">Pitch </label>
+      <input type="number" id="pitch" value="1" step="0.1" min="0.5" max="10">
+    </div>
 
-<button id="saveBtn" class="bg-blue-500 px-4 py-2 rounded-lg text-white font-semibold w-full">Save Processed Audio</button>
+    <div class="slider-group">
+      <label for="echo">Echo Level </label>
+      <input type="number" id="echo" value="1" step="0.1" min="0" max="10">
+    </div>
 
-  </div>  <script>
-    let player;
-    let pitchShift;
-    let feedbackDelay;
-    let currentFile;
+    <button id="applyBtn">Apply Effects</button>
+  </div>
 
-    const fileInput = document.getElementById('fileInput');
-    const playBtn = document.getElementById('playBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const playlist = document.getElementById('playlist');
-    const speedControl = document.getElementById('speedControl');
-    const pitchControl = document.getElementById('pitchControl');
-    const echoControl = document.getElementById('echoControl');
-    const saveBtn = document.getElementById('saveBtn');
+  <script>
+    const fileInput = document.getElementById('audioFile');
+    const player = document.getElementById('player');
+    const speedInput = document.getElementById('speed');
+    const pitchInput = document.getElementById('pitch');
+    const echoInput = document.getElementById('echo');
+    const applyBtn = document.getElementById('applyBtn');
 
-    let audioFiles = [];
+    let audioCtx, source, pitchShifter, delayNode;
 
     fileInput.addEventListener('change', (e) => {
-      audioFiles = Array.from(e.target.files);
-      renderPlaylist();
+      const file = e.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        player.src = url;
+      }
     });
 
-    function renderPlaylist() {
-      playlist.innerHTML = '';
-      audioFiles.forEach((file, index) => {
-        const li = document.createElement('li');
-        li.className = 'flex justify-between items-center bg-gray-700 p-2 rounded-lg';
-        li.innerHTML = '<span>${file.name}</span><button class="bg-red-500 text-white px-2 py-1 rounded removeBtn">Delete</button>';
-        li.querySelector('.removeBtn').addEventListener('click', () => {
-          audioFiles.splice(index, 1);
-          renderPlaylist();
-        });
-        li.addEventListener('click', () => loadFile(file));
-        playlist.appendChild(li);
-      });
-    }
+    applyBtn.addEventListener('click', async () => {
+      if (!player.src) {
+        alert("Please upload a song first!");
+        return;
+      }
 
-    async function loadFile(file) {
-      if (player) player.dispose();
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await Tone.getContext().rawContext.decodeAudioData(arrayBuffer);
+      if (audioCtx) audioCtx.close();
+      audioCtx = new AudioContext();
 
-      const buffer = new Tone.ToneAudioBuffer().fromArray(audioBuffer.getChannelData(0));
-      player = new Tone.Player(buffer).toDestination();
+      source = audioCtx.createMediaElementSource(player);
+      delayNode = audioCtx.createDelay();
+      const gainNode = audioCtx.createGain();
 
-      pitchShift = new Tone.PitchShift().toDestination();
-      feedbackDelay = new Tone.FeedbackDelay('8n', 0).toDestination();
-      player.connect(pitchShift);
-      pitchShift.connect(feedbackDelay);
-      feedbackDelay.toDestination();
+      const pitch = parseFloat(pitchInput.value);
+      const speed = parseFloat(speedInput.value);
+      const echo = parseFloat(echoInput.value);
 
-      currentFile = file;
-    }
+      player.playbackRate = speed;
+      delayNode.delayTime.value = echo * 0.1;
+      gainNode.gain.value = 1;
 
-    playBtn.addEventListener('click', async () => {
-      if (!currentFile) return alert('Please select a file.');
-      await Tone.start();
-      player.playbackRate = parseFloat(speedControl.value);
-      pitchShift.pitch = parseInt(pitchControl.value);
-      feedbackDelay.feedback.value = parseFloat(echoControl.value);
-      player.start();
+      source.connect(delayNode);
+      delayNode.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      player.play();
     });
-    stopBtn.addEventListener('click', () => {
-      if (player) player.stop();
-    });
+  </script>
+</body>
 
-    speedControl.addEventListener('input', () => {
-      if (player) player.playbackRate = parseFloat(speedControl.value);
-    });
-
-    pitchControl.addEventListener('input', () => {
-      if (pitchShift) pitchShift.pitch = parseInt(pitchControl.value);
-    });
-
-    echoControl.addEventListener('input', () => {
-      if (feedbackDelay) feedbackDelay.feedback.value = parseFloat(echoControl.value);
-    });
-
-    saveBtn.addEventListener('click', () => {
-      alert('Feature coming soon! You can export using Tone.js OfflineContext later.');
-    });
-  </script></body>
 </html>
